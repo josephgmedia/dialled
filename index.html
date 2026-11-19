@@ -37,7 +37,7 @@
 .method-switch { width:max-content; gap:0; margin:13px auto 14px; padding:3px; border-radius:24px; background:var(--sand); }
 .method-switch button { border:0; border-radius:22px; padding:0 18px; min-height:44px; color:var(--ink); }
 .method-switch button.active { background:var(--paper); color:var(--ink); }
-.timer { background:#253d34; color:var(--white); border-radius:24px; padding:12px 16px 17px; }
+.timer { background:var(--olive); color:var(--white); border-radius:24px; padding:12px 16px 17px; }
 .timer-art { max-width:365px; margin:auto; }
 .timer-art canvas { display:block; width:100%; height:auto; }
 .timer-clock { display:flex; justify-content:center; align-items:baseline; font:500 clamp(43px,12vw,55px)/1 var(--sans); }
@@ -133,7 +133,7 @@
 <section id="history" class="screen"><div class="collection-top"><div><span class="overline">Your records</span><h2>Brew history</h2></div><button class="btn small" data-page="session">+ New brew</button></div><div id="history-list"></div><hr class="rule"><div class="button-row"><button class="btn ghost small" id="export">Export backup</button><label class="btn ghost small" for="import">Import backup</label><input id="import" type="file" accept="application/json" hidden></div><p class="helper">Stored on this device. Export a backup before clearing your browser data.</p></section>
 <section id="editor" class="screen"><div class="form-page"><span class="overline">Collection</span><h2 id="editor-title">Add coffee</h2><form id="coffee-form"><div class="surface"><div class="fields"><div class="field"><label for="name">Coffee name</label><input id="name" required placeholder="e.g. Melondrop"></div><div class="field"><label for="roaster">Roaster</label><input id="roaster" required placeholder="e.g. The Wood Roaster"></div><div class="field"><label for="origin">Origin</label><input id="origin" placeholder="e.g. Colombia"></div><div class="field"><label for="process">Process</label><input id="process" placeholder="e.g. Washed"></div><div class="field"><label for="roast-date">Roast date</label><input id="roast-date" type="date"></div><div class="field"><label for="weight">Bag size (g)</label><input id="weight" type="number" value="250"></div><div class="field"><label for="tone">Card background</label><input id="tone" type="color" value="#7b6b43" style="height:47px;padding:5px"></div><div class="field"><label for="serve">Good with</label><select id="serve"><option value="">Not specified</option><option>Black</option><option>Milk</option><option>Black & milk</option></select></div><div class="field wide"><label for="coffee-method">Roasted for</label><select id="coffee-method"><option value="">Not specified</option><option value="espresso">Espresso</option><option value="filter">Filter</option><option value="both">Espresso &amp; filter</option></select></div><div class="field wide"><label for="bag-image-url">Bag image URL</label><input id="bag-image-url" type="url" placeholder="https://roaster.com/bag.png"><small>Paste a direct image link. Transparent PNG or WebP works best.</small></div><div class="field wide"><label for="collections">Collections</label><input id="collections" placeholder="Everyday, Filter favourites"><small>Separate collection names with commas.</small></div><div class="field wide"><label for="photo">Coffee bag photo</label><input id="photo" type="file" accept="image/*"><small>Choose a transparent cutout for the floating bag effect. Photos keep their original background.</small></div><div class="field wide"><label for="tasting-notes">Tasting notes</label><input id="tasting-notes" placeholder="Chocolate · Hazelnut · Honey"></div><div class="field wide"><label for="coffee-notes">Coffee notes</label><textarea id="coffee-notes" placeholder="Tasting notes, recommendations, anything useful"></textarea></div></div></div><div class="button-row"><button type="submit" class="btn">Save coffee</button><button type="button" class="btn ghost" data-page="collection">Cancel</button></div></form></div></section></main></div>
 <nav class="mobile-nav" id="mobile-nav"><button data-page="brew" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 9h11v7a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V9ZM16 10h2a3 3 0 0 1 0 6h-2M4 4h13"/></svg>Brew</button><button data-page="collection"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>Collection</button><button data-page="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 3"/></svg>History</button></nav><div class="toast" id="toast"></div><script>
-(()=>{'use strict';const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36),today=()=>new Date().toISOString().slice(0,10),safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let db;try{db=JSON.parse(localStorage.getItem('dialled-v3'))}catch{}if(!db||!Array.isArray(db.coffees))db={coffees:[{id:'sample',name:'Signature Blend',roaster:'Golden Brown',serve:'Black & milk',brewMethod:'espresso',tastingNotes:'Chocolate · Hazelnut · Honey',notes:'Sample coffee.',tone:'#7b6b43',favorite:false,collections:['Everyday']}],bags:[{id:'sample-bag',coffeeId:'sample',roastDate:'2026-11-01',weight:250}],brews:[],active:'sample'};let page='brew',filter='All',detailId='sample',editId=null,method='espresso',photoData=null,savedImageUrl='',elapsed=0,startAt=0,ticker=null;const persist=()=>{try{localStorage.setItem('dialled-v3',JSON.stringify(db))}catch{toast('Storage full. Try a smaller photo.')}};const coffee=id=>db.coffees.find(c=>c.id===id),active=()=>coffee(db.active)||db.coffees[0],bags=id=>db.bags.filter(b=>b.coffeeId===id),bag=id=>bags(id).at(-1),age=b=>b?.roastDate?Math.max(0,Math.floor((new Date(today()+'T12:00:00')-new Date(b.roastDate+'T12:00:00'))/86400000)):null,format=(d,short=false)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',...(short?{}:{year:'numeric'})}):'Not recorded';function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),2500)}function imageSource(c){if(c?.photo)return c.photo;try{const url=new URL(c?.imageUrl);return url.protocol==="https:"?url.href:""}catch{return ""}}function methodLabel(c){return ({espresso:"Espresso",filter:"Filter",both:"Espresso & filter"})[c?.brewMethod]||""}function art(c){const source=imageSource(c);if(source)return `<img src="${safe(source)}" referrerpolicy="no-referrer" alt="${safe(c.name)} bag">`;return `<div class="bag-mock"><small>${safe((c?.roaster||'COFFEE').slice(0,22).toUpperCase())}</small><strong>${safe(c?.name||'COFFEE')}</strong><b>Add a bag photo</b></div>`}function show(p){const pageBefore=page;page=p;$$('.screen').forEach(e=>e.classList.toggle('active',e.id===p));$$('[data-page]').forEach(e=>e.classList.toggle('active',e.dataset.page===p));if(p==='session')renderSession(pageBefore!=='session');if(p==='detail')renderDetail();if(p==='editor')renderEditor();render();window.scrollTo(0,0)}function render(){let c=active(),b=c&&bag(c.id);
+(()=>{'use strict';const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36),today=()=>new Date().toISOString().slice(0,10),safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let db;try{db=JSON.parse(localStorage.getItem('dialled-v3'))}catch{}if(!db||!Array.isArray(db.coffees))db={coffees:[{id:'sample',name:'Signature Blend',roaster:'Golden Brown',serve:'Black & milk',brewMethod:'espresso',tastingNotes:'Chocolate · Hazelnut · Honey',notes:'Sample coffee.',tone:'#7b6b43',favorite:false,collections:['Everyday']}],bags:[{id:'sample-bag',coffeeId:'sample',roastDate:'2026-11-01',weight:250}],brews:[],active:'sample'};let page='brew',filter='All',detailId='sample',editId=null,method='espresso',photoData=null,savedImageUrl='',elapsed=0,startAt=0,ticker=null;const persist=()=>{try{localStorage.setItem('dialled-v3',JSON.stringify(db))}catch{toast('Storage full. Try a smaller photo.')}};const coffee=id=>db.coffees.find(c=>c.id===id),active=()=>coffee(db.active)||db.coffees[0],bags=id=>db.bags.filter(b=>b.coffeeId===id),bag=id=>bags(id).at(-1),age=b=>b?.roastDate?Math.max(0,Math.floor((new Date(today()+'T12:00:00')-new Date(b.roastDate+'T12:00:00'))/86400000)):null,format=(d,short=false)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',...(short?{}:{year:'numeric'})}):'Not recorded';function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),2500)}function imageSource(c){if(c?.photo)return c.photo;if(c?.id==='sample'&&!c.imageUrl)return 'assets/golden-brown-bag.png';try{const url=new URL(c?.imageUrl);return url.protocol==="https:"?url.href:""}catch{return ""}}function methodLabel(c){return ({espresso:"Espresso",filter:"Filter",both:"Espresso & filter"})[c?.brewMethod]||""}function art(c){const source=imageSource(c);if(source)return `<img src="${safe(source)}" referrerpolicy="no-referrer" alt="${safe(c.name)} bag">`;return `<div class="bag-mock"><small>${safe((c?.roaster||'COFFEE').slice(0,22).toUpperCase())}</small><strong>${safe(c?.name||'COFFEE')}</strong><b>Add a bag photo</b></div>`}function show(p){const pageBefore=page;page=p;$$('.screen').forEach(e=>e.classList.toggle('active',e.id===p));$$('[data-page]').forEach(e=>e.classList.toggle('active',e.dataset.page===p));if(p==='session')renderSession(pageBefore!=='session');if(p==='detail')renderDetail();if(p==='editor')renderEditor();render();window.scrollTo(0,0)}function render(){let c=active(),b=c&&bag(c.id);
   $('#hero-roaster').textContent=c?.roaster||'';
   $('#hero-name').textContent=c?.name||'Your next coffee';
   $('#hero-notes').textContent=c?.tastingNotes||'';
@@ -166,7 +166,15 @@ const context=canvas.getContext('2d');
 
 const brewIllustration=new Image();
 brewIllustration.onload=()=>clock();
-brewIllustration.src='assets/brew-ink-pair.png';
+brewIllustration.src='assets/brew-olive-pair.png';
+
+// Fixed grain coordinates preserve the printed texture between frames.
+const liquidGrain=Array.from({length:2200},(_,index)=>({
+  x:((index*0.61803398875)%1)*124-62,
+  y:326+((index*0.754877666)%1)*100,
+  radius:.35+((index*0.414213562)%1)*.55,
+  alpha:.25+((index*0.732050807)%1)*.6
+}));
 function drawInkBrew(ms,extend,drain){
   const isEspresso=method==='espresso';
   const sourceWidth=brewIllustration.naturalWidth/2;
@@ -174,47 +182,90 @@ function drawInkBrew(ms,extend,drain){
     sourceWidth,brewIllustration.naturalHeight,70,-35,420,560);
   const x=isEspresso?242:263;
   const top=isEspresso?198:246;
-  const surface=434-70*Math.min(1,ms/35000);
+  const contactTime=flowDuration;
+  const fillTime=Math.max(0,ms-contactTime);
+  const fill=1-Math.exp(-fillTime/21000);
+  const surface=417-78*fill;
+  const settling=flowStoppedAt===null?1:Math.exp(-(performance.now()-flowStoppedAt)/220);
+  const motion=reducedMotion.matches?0:settling;
+  const phase=ms/190;
   const inside=new Path2D();
-  inside.moveTo(x-58,330);
-  inside.quadraticCurveTo(x-55,407,x-25,429);
-  inside.quadraticCurveTo(x,440,x+25,429);
-  inside.quadraticCurveTo(x+55,407,x+58,330);
+  inside.moveTo(x-57,330);
+  inside.bezierCurveTo(x-56,370,x-42,410,x-23,419);
+  inside.quadraticCurveTo(x,426,x+23,419);
+  inside.bezierCurveTo(x+42,410,x+56,370,x+57,330);
   inside.closePath();
-  if(ms>0){
+  const wave=(position)=>motion*(Math.sin(position*.095+phase)*1.1+
+    Math.sin(position*.15-phase*.8)*.55);
+  if(fillTime>0){
     context.save();
     context.clip(inside);
-    context.fillStyle='#e1bb8033';
-    context.fillRect(x-60,surface,120,100);
-    context.fillStyle=crema;
-    for(let index=0;index<300;index++){
-      const dotX=x-59+(index*71%118);
-      const dotY=surface+(index*37%80);
-      context.globalAlpha=.25;
-      context.fillRect(dotX,dotY,1,1);
+    const liquid=new Path2D();
+    liquid.moveTo(x-62,430);
+    liquid.lineTo(x-62,surface+wave(-62));
+    for(let position=-60;position<=62;position+=2){
+      liquid.lineTo(x+position,surface+wave(position));
     }
-    context.globalAlpha=.65;
-    context.beginPath();
-    context.ellipse(x,surface,54,5,0,0,Math.PI*2);
+    liquid.lineTo(x+62,430);
+    liquid.closePath();
+    context.clip(liquid);
+    context.fillStyle='#685634';
+    context.globalAlpha=.48;
+    context.fillRect(x-62,surface-3,124,112);
+    context.fillStyle=crema;
+    for(const dot of liquidGrain){
+      context.globalAlpha=dot.alpha;
+      context.beginPath();
+      context.arc(x+dot.x,dot.y,dot.radius,0,Math.PI*2);
+      context.fill();
+    }
+    context.restore();
+    context.save();
+    context.clip(inside);
     context.strokeStyle=crema;
     context.lineWidth=1;
+    context.globalAlpha=.85;
+    const radius=20+36*Math.sqrt(Math.min(1,(422-surface)/92));
+    context.beginPath();
+    context.ellipse(x,surface,radius,3.2,0,0,Math.PI*2);
     context.stroke();
+    if(motion>.02){
+      for(let ring=0;ring<2;ring++){
+        const progress=(ms/850+ring*.5)%1;
+        context.globalAlpha=(1-progress)*.55*motion;
+        context.beginPath();
+        context.ellipse(x,surface,3+progress*radius,1+progress*3,0,0,Math.PI*2);
+        context.stroke();
+      }
+      for(let drop=0;drop<3;drop++){
+        const age=(ms/600+drop/3)%1;
+        const direction=drop%2?1:-1;
+        context.globalAlpha=(1-age)*.7*motion;
+        context.fillStyle=crema;
+        context.beginPath();
+        context.arc(x+direction*age*14,surface-22*age*(1-age),.8,0,Math.PI*2);
+        context.fill();
+      }
+    }
     context.restore();
   }
   if(extend>drain){
     const distance=surface-top;
     context.save();
     context.beginPath();
-    context.rect(x-6,top+distance*drain,12,distance*(extend-drain));
+    context.rect(x-7,top+distance*drain,14,distance*(extend-drain));
     context.clip();
     context.strokeStyle=crema;
-    context.lineWidth=1.4;
-    context.beginPath();
-    context.moveTo(x-1,top);
-    context.bezierCurveTo(x+1.5,top+50,x-1.4,surface-40,x,surface);
-    context.moveTo(x+1.8,top);
-    context.bezierCurveTo(x+2.5,top+40,x+1,surface-50,x+2,surface);
-    context.stroke();
+    context.lineWidth=1.2;
+    for(const offset of [-1.2,1.2]){
+      context.beginPath();
+      context.moveTo(x+offset,top);
+      for(let position=0;position<=distance;position+=3){
+        const sway=motion*Math.sin(position*.035-phase*.65)*.75*(position/distance);
+        context.lineTo(x+offset+sway,top+position);
+      }
+      context.stroke();
+    }
     context.restore();
   }
 }
@@ -247,7 +298,7 @@ function paintTimer(){
   const extend=Math.min(1,flowTime/flowDuration);
   const drain=Math.min(1,stopDelay/flowDuration);
   drawBrew(ms,reducedMotion.matches?(running?1:0):extend,reducedMotion.matches?0:drain);
-  if(!reducedMotion.matches&&(running||drain<extend)){
+  if(!reducedMotion.matches&&(running||drain<extend||flowStoppedAt!==null&&stopDelay<1100)){
     animationFrame=requestAnimationFrame(paintTimer);
   }
 }
