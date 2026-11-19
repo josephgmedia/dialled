@@ -37,7 +37,7 @@
 .method-switch { width:max-content; gap:0; margin:13px auto 14px; padding:3px; border-radius:24px; background:var(--sand); }
 .method-switch button { border:0; border-radius:22px; padding:0 18px; min-height:44px; color:var(--ink); }
 .method-switch button.active { background:var(--paper); color:var(--ink); }
-.timer { background:var(--deep-olive); color:var(--white); border-radius:24px; padding:12px 16px 17px; }
+.timer { background:#253d34; color:var(--white); border-radius:24px; padding:12px 16px 17px; }
 .timer-art { max-width:365px; margin:auto; }
 .timer-art canvas { display:block; width:100%; height:auto; }
 .timer-clock { display:flex; justify-content:center; align-items:baseline; font:500 clamp(43px,12vw,55px)/1 var(--sans); }
@@ -163,40 +163,60 @@ $('#current-bag').innerHTML=c?`<div class="detail-row"><span>Roasted</span><b>${
 }
 function renderEditor(){let c=coffee(editId);$('#editor-title').textContent=c?'Edit coffee':'Add coffee';$('#coffee-form').reset();for(let k of ['name','roaster','origin','process','serve'])$('#'+k).value=c?.[k]||'';$('#tone').value=cardTone(c);$('#collections').value=(c?.collections||[]).join(', ');$('#coffee-method').value=c?.brewMethod||'';$('#bag-image-url').value=c?.imageUrl||'';$('#coffee-notes').value=c?.notes||'';$('#tasting-notes').value=c?.tastingNotes||'';$('#roast-date').value=editId?'':today();photoData=c?.photo||null;savedImageUrl=c?.imageUrl||''}const canvas=$('#brew-art'), ink='#ead6b4', crema='#e1bb80';
 const context=canvas.getContext('2d');
-const espressoImage=new Image();
-espressoImage.onload=()=>clock();
-espressoImage.src='assets/espresso-engraving.png';
-const engravedCup=new Path2D('M114 277Q225 306 352 277L334 411Q321 447 238 454Q163 453 143 414Z');
-function drawEngravedEspresso(ms,extend,drain){
-  const surface=448-95*Math.min(1,ms/35000);
-  context.save();
-  context.clip(engravedCup);
+
+const brewIllustration=new Image();
+brewIllustration.onload=()=>clock();
+brewIllustration.src='assets/brew-ink-pair.png';
+function drawInkBrew(ms,extend,drain){
+  const isEspresso=method==='espresso';
+  const sourceWidth=brewIllustration.naturalWidth/2;
+  context.drawImage(brewIllustration,isEspresso?0:sourceWidth,0,
+    sourceWidth,brewIllustration.naturalHeight,70,-35,420,560);
+  const x=isEspresso?242:263;
+  const top=isEspresso?198:246;
+  const surface=434-70*Math.min(1,ms/35000);
+  const inside=new Path2D();
+  inside.moveTo(x-58,330);
+  inside.quadraticCurveTo(x-55,407,x-25,429);
+  inside.quadraticCurveTo(x,440,x+25,429);
+  inside.quadraticCurveTo(x+55,407,x+58,330);
+  inside.closePath();
   if(ms>0){
-    context.fillStyle=brewFill;
-    context.fillRect(105,surface,255,110);
-    context.fillStyle=crema;
-    context.fillRect(105,surface,255,2);
-  }
-  context.restore();
-  if(extend>drain){
-    const top=180, distance=surface-top, x=232;
     context.save();
-    context.beginPath();
-    context.rect(x-24,top+distance*drain,48,distance*(extend-drain));
-    context.clip();
+    context.clip(inside);
+    context.fillStyle='#e1bb8033';
+    context.fillRect(x-60,surface,120,100);
     context.fillStyle=crema;
+    for(let index=0;index<300;index++){
+      const dotX=x-59+(index*71%118);
+      const dotY=surface+(index*37%80);
+      context.globalAlpha=.25;
+      context.fillRect(dotX,dotY,1,1);
+    }
+    context.globalAlpha=.65;
     context.beginPath();
-    context.moveTo(x-13,top);
-    context.quadraticCurveTo(x-2,top+14,x-2,top+37);
-    context.lineTo(x-2,surface);
-    context.lineTo(x+2,surface);
-    context.lineTo(x+2,top+37);
-    context.quadraticCurveTo(x+2,top+14,x+13,top);
-    context.closePath();
-    context.fill();
+    context.ellipse(x,surface,54,5,0,0,Math.PI*2);
+    context.strokeStyle=crema;
+    context.lineWidth=1;
+    context.stroke();
     context.restore();
   }
-  context.drawImage(espressoImage,0,0,560,500);
+  if(extend>drain){
+    const distance=surface-top;
+    context.save();
+    context.beginPath();
+    context.rect(x-6,top+distance*drain,12,distance*(extend-drain));
+    context.clip();
+    context.strokeStyle=crema;
+    context.lineWidth=1.4;
+    context.beginPath();
+    context.moveTo(x-1,top);
+    context.bezierCurveTo(x+1.5,top+50,x-1.4,surface-40,x,surface);
+    context.moveTo(x+1.8,top);
+    context.bezierCurveTo(x+2.5,top+40,x+1,surface-50,x+2,surface);
+    context.stroke();
+    context.restore();
+  }
 }
 const clockDisplay=$('#clock');
 const brewFill=context.createLinearGradient(0,357,0,447);
@@ -233,8 +253,8 @@ function paintTimer(){
 }
 function drawBrew(ms, extend, drain){
   context.clearRect(0,0,560,500);
-  if(method==='espresso'&&espressoImage.complete&&espressoImage.naturalWidth){
-    drawEngravedEspresso(ms,extend,drain);
+  if(brewIllustration.complete&&brewIllustration.naturalWidth){
+    drawInkBrew(ms,extend,drain);
     return;
   }
   context.strokeStyle=ink;
