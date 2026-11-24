@@ -249,7 +249,7 @@ function drawInkBrew(ms,extend,drain){
   const fill=method==='filter'?Math.min(.8,filterState.output/320):.68*(1-Math.exp(-fillTime/78000));
   const surface=417-78*fill;
   const settling=flowStoppedAt===null?1:Math.exp(-(performance.now()-flowStoppedAt)/220);
-  const motion=reducedMotion.matches?0:settling*(method==='espresso'||filterState.valveOpen&&filterState.held>.15?1:.12);
+  const motion=reducedMotion.matches?0:settling*(method==='espresso'||illustratedValveOpen(ms)&&filterState.held>.15?1:.12);
   const phase=ms/190;
   const inside=new Path2D();
   inside.moveTo(x-57,330);
@@ -312,7 +312,7 @@ function drawInkBrew(ms,extend,drain){
     context.restore();
   }
   if(!isEspresso){
-    const flow=streamEnvelope(filterStreams.outlet,ticker!==null&&filterState.valveOpen&&filterState.held>.15,performance.now(),reducedMotion.matches);
+    const flow=streamEnvelope(filterStreams.outlet,ticker!==null&&illustratedValveOpen(ms)&&filterState.held>.15,performance.now(),reducedMotion.matches);
     extend=flow.head;drain=flow.tail;
   }
   if(extend>drain){
@@ -650,6 +650,12 @@ $('#finish-filter').onclick=()=>{
   filterEvent('finish');
   clock();
 };
+function illustratedValveOpen(ms){
+  const recipe=chosenRecipe();
+  // Recipe artwork demonstrates the planned flow. Confirmation events record
+  // the user's physical actions independently and never gate the illustration.
+  return recipe?recipeStatusFor(recipe,ms).stage.valveOpen:filterState.valveOpen;
+}
 function advanceFilter(ms){
   const dt=Math.max(0,Math.min(.25,(ms-filterState.lastMs)/1000));
   filterState.lastMs=ms;
@@ -663,7 +669,7 @@ function advanceFilter(ms){
   }else if(filterState.pouring){
     filterState.held=Math.min(250,filterState.held+dt*5);
   }
-  if(filterState.valveOpen){
+  if(illustratedValveOpen(ms)){
     const drained=Math.min(filterState.held,dt*(2+filterState.held*.045));
     filterState.held-=drained;
     filterState.output=Math.min(300,filterState.output+drained);
@@ -778,11 +784,12 @@ function drawFilterActivity(ms){
   }
   context.globalAlpha=1;
   if(state.style==='pourover'){context.restore();return}
-  context.strokeStyle=state.valveOpen?'#fbf5e9':'#e1bb80';
+  const valveOpen=illustratedValveOpen(ms);
+  context.strokeStyle=valveOpen?'#fbf5e9':'#e1bb80';
   context.lineWidth=2;
   context.beginPath();
   context.moveTo(282,246);
-  context.lineTo(300,state.valveOpen?253:239);
+  context.lineTo(300,valveOpen?253:239);
   context.stroke();
   context.restore();
 }
