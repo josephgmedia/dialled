@@ -65,3 +65,30 @@ function recipeWaterAt(recipe,milliseconds){
   const progress=Math.max(0,Math.min(1,status.elapsed/duration));
   return previous+(status.stage.water-previous)*progress;
 }
+
+// Compile editable stage durations into the same absolute timeline as a preset.
+function compileRecipe(draft){
+  if(!draft.name.trim())throw Error('Give your recipe a name.');
+  if(!(draft.dose>0&&draft.dose<=100&&draft.temp>=60&&draft.temp<=100))throw Error('Use a dose up to 100 g and a temperature between 60 and 100°C.');
+  if(!draft.stages.length||draft.stages.length>16)throw Error('Use between 1 and 16 stages.');
+  let at=0,water=0;
+  const stages=draft.stages.map((row,index)=>{
+    const last=index===draft.stages.length-1;
+    const untimed=last&&draft.openEnd;
+    if(!row.label.trim())throw Error('Give every stage a name.');
+    if(!untimed&&(!Number.isInteger(row.duration)||row.duration<1||row.duration>3600))throw Error('Stage durations must be whole seconds between 1 and 3600.');
+    if(!Number.isFinite(row.water)||row.water<water||row.water>3000)throw Error('Water targets must increase or stay the same, up to 3000 g.');
+    if(!Number.isFinite(row.pour)||row.pour<0||(!untimed&&row.pour>row.duration))throw Error('Pour time must fit inside its stage.');
+    if(row.water>water&&row.pour===0)throw Error('Add a pour time to each stage that adds water.');
+    const stage={at,label:row.label.trim(),water:row.water,valveOpen:draft.style==='pourover'||row.valveOpen,note:row.instruction.trim(),
+      instruction:row.instruction.trim()||row.label.trim()+'. '+(draft.style==='pourover'?'':row.valveOpen?'Valve open. ':'Valve closed. ')+(row.water>water?'Pour to '+row.water+' g total.':'Let the coffee rest or drain.')};
+    if(row.water>water)stage.pourEnd=at+row.pour;
+    water=row.water;
+    if(!untimed)at+=row.duration;
+    return stage;
+  });
+  if(water<=0)throw Error('Add a water target for your brew.');
+  return {name:draft.name.trim(),style:draft.style,dose:draft.dose,temp:draft.temp,water,
+    brewer:draft.style==='pourover'?'Pour over':'Hario Switch',targetEnd:draft.openEnd?null:at,
+    stages,credit:'Your recipe',source:''};
+}
