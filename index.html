@@ -145,7 +145,7 @@
     <div class="field"><label for="new-bag-weight">Bag size (g)</label><input id="new-bag-weight" type="number" min="1" value="250"></div>
     <div class="button-row"><button class="btn" type="submit">Add bag</button><button type="button" class="btn ghost" id="cancel-bag">Cancel</button></div>
   </form>
-</dialog><div class="toast" id="toast"></div><script src="recipes.js?v=editable-stages-1"></script><script>
+</dialog><div class="toast" id="toast"></div><script src="recipes.js?v=editable-stages-1"></script><script src="motion.js?v=1"></script><script>
 (()=>{'use strict';const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36),today=()=>new Date().toISOString().slice(0,10),safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let db;try{db=JSON.parse(localStorage.getItem('dialled-v3'))}catch{}if(!db||!Array.isArray(db.coffees))db={coffees:[{id:'sample',name:'Signature Blend',roaster:'Golden Brown',serve:'Black & milk',brewMethod:'espresso',tastingNotes:'Chocolate · Hazelnut · Honey',notes:'Sample coffee.',tone:'#7b6b43',favorite:false,collections:['Everyday']}],bags:[{id:'sample-bag',coffeeId:'sample',roastDate:'2026-11-01',weight:250}],brews:[],active:'sample'};let page='brew',filter='All',detailId='sample',editId=null,method='espresso',photoData=null,savedImageUrl='',elapsed=0,startAt=0,ticker=null;const persist=()=>{try{localStorage.setItem('dialled-v3',JSON.stringify(db))}catch{toast('Storage full. Try a smaller photo.')}};const coffee=id=>db.coffees.find(c=>c.id===id),active=()=>coffee(db.active)||db.coffees[0],bags=id=>db.bags.filter(b=>b.coffeeId===id),bag=id=>bags(id).at(-1),age=b=>b?.roastDate?Math.max(0,Math.floor((new Date(today()+'T12:00:00')-new Date(b.roastDate+'T12:00:00'))/86400000)):null,format=(d,short=false)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',...(short?{}:{year:'numeric'})}):'Not recorded';function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),2500)}function imageSource(c){if(c?.photo)return c.photo;if(c?.id==='sample'&&!c.imageUrl)return 'assets/golden-brown-bag.png';try{const url=new URL(c?.imageUrl);return url.protocol==="https:"?url.href:""}catch{return ""}}function methodLabel(c){return ({espresso:"Espresso",filter:"Filter",both:"Espresso & filter"})[c?.brewMethod]||""}function art(c){const source=imageSource(c);if(source)return `<img src="${safe(source)}" referrerpolicy="no-referrer" alt="${safe(c.name)} bag">`;return `<div class="bag-mock"><small>${safe((c?.roaster||'COFFEE').slice(0,22).toUpperCase())}</small><strong>${safe(c?.name||'COFFEE')}</strong><b>Add a bag photo</b></div>`}function show(p){const pageBefore=page;page=p;$$('.screen').forEach(e=>e.classList.toggle('active',e.id===p));$$('[data-page]').forEach(e=>e.classList.toggle('active',e.dataset.page===p));if(p==='session')renderSession(pageBefore!=='session');if(p==='detail')renderDetail();if(p==='editor')renderEditor();render();window.scrollTo(0,0)}function render(){let c=active(),b=c&&(db.bags.find(item=>item.id===db.activeBag&&item.coffeeId===c.id)||bag(c.id));
   $('#home-coffee').innerHTML=db.coffees.map(item=>'<option value="'+safe(item.id)+'">'+safe(item.roaster)+' · '+safe(item.name)+'</option>').join('');
   $('#home-coffee').value=c?.id||'';
@@ -311,7 +311,11 @@ function drawInkBrew(ms,extend,drain){
     }
     context.restore();
   }
-  if(extend>drain&&(method==='espresso'||filterState.valveOpen&&filterState.held>.15)){
+  if(!isEspresso){
+    const flow=streamEnvelope(filterStreams.outlet,ticker!==null&&filterState.valveOpen&&filterState.held>.15,performance.now(),reducedMotion.matches);
+    extend=flow.head;drain=flow.tail;
+  }
+  if(extend>drain){
     const distance=surface-top;
     context.save();
     context.beginPath();
@@ -349,6 +353,7 @@ const artwork={
 };
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const flowDuration=430;
+const filterStreams={inlet:{},outlet:{}};
 let flowStartedAt=0, flowStoppedAt=null, animationFrame=0;
 function paintTimer(){
   cancelAnimationFrame(animationFrame);
@@ -361,7 +366,7 @@ function paintTimer(){
   const extend=Math.min(1,flowTime/flowDuration);
   const drain=Math.min(1,stopDelay/flowDuration);
   drawBrew(ms,reducedMotion.matches?(running?1:0):extend,reducedMotion.matches?0:drain);
-  if(!reducedMotion.matches&&(running||drain<extend||flowStoppedAt!==null&&stopDelay<1100)){
+  if(!reducedMotion.matches&&(running||drain<extend||filterStreams.inlet.moving||filterStreams.outlet.moving||flowStoppedAt!==null&&stopDelay<1100)){
     animationFrame=requestAnimationFrame(paintTimer);
   }
 }
@@ -557,6 +562,7 @@ function startFilterPour(){
   filterEvent('pour-start',{pour:filterState.pourNumber,valveOpen:filterState.valveOpen});
 }
 function resetFilter(){
+  filterStreams.inlet={};filterStreams.outlet={};
   Object.assign(filterState,{pouring:false,water:0,held:0,output:0,lastMs:0,
     events:[],pourNumber:0,recipeStage:-1,visualInput:0,complete:false,valveOpen:filterState.style==='pourover'});
   $('#pour-water').value='';
@@ -742,7 +748,12 @@ function drawFilterActivity(ms){
     const status=recipeStatusFor(recipe,ms);
     return status.stage.pourEnd!==undefined&&ms/1000<status.stage.pourEnd&&!!state.pourNumber;
   })():state.pouring;
-  if(visualPour){
+  const pour=streamEnvelope(filterStreams.inlet,visualPour&&ticker!==null,performance.now(),reducedMotion.matches);
+  if(pour.head>pour.tail){
+    context.save();
+    context.beginPath();
+    context.rect(180,75+85*pour.tail,110,85*(pour.head-pour.tail));
+    context.clip();
     context.beginPath();
     context.moveTo(188,75);
     context.quadraticCurveTo(235,90,263+Math.sin(phase)*12,160);
@@ -751,6 +762,7 @@ function drawFilterActivity(ms){
     context.moveTo(188,78);
     context.quadraticCurveTo(233,92,265+Math.sin(phase)*12,160);
     context.stroke();
+    context.restore();
   }
   if(state.events.length){
     for(let index=0;index<3;index++){
